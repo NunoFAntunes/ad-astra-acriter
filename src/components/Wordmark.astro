@@ -1,0 +1,118 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = HTMLAttributes<'span'> & {
+  /** Render expanded ("AD ASTRA ACRITER") instead of the collapsed ΛΛΛ. */
+  open?: boolean;
+};
+
+const { open = false, class: className, ...rest } = Astro.props;
+
+// Each word is a Λ glyph followed by its tail. Letters carry a running
+// index (--i) so the fade-in can stagger across the whole name.
+const TAILS = ['D', 'STRA', 'CRITER'];
+let i = 0;
+const words = TAILS.map((tail) => [...tail].map((char) => ({ char, i: i++ })));
+
+const GLYPH = 'M0 549 230 0h55l230 549h-91L257.5 116 91 549Z';
+---
+
+<span class:list={['wordmark', { 'is-open': open }, className]} data-wordmark aria-hidden="true" {...rest}>
+  {words.map((letters) => (
+    <span class="wm-word">
+      <svg class="wm-a" viewBox="0 0 515 549"><path d={GLYPH} fill="currentColor" /></svg>
+      <span class="wm-tail"><span class="wm-letters">{letters.map(({ char, i }) => <span style={`--i:${i}`}>{char}</span>)}</span></span>
+    </span>
+  ))}
+</span>
+
+<style>
+  /* Three Λ glyphs are the logo. Each is followed by a "tail"
+     (D / STRA / CRITER) whose width animates between 0 and the
+     measured natural width (--w, set in scripts/wordmark.ts). */
+
+  .wordmark {
+    --cap: .7em;                                  /* Jost cap height */
+    --a-w: calc(var(--cap) * 515 / 549);
+    --gap-closed: calc(var(--cap) * .2295);       /* logo spacing */
+    --gap-open: .42em;
+    --track: .2em;
+
+    --dur-open: .8s;
+    --dur-close: .7s;
+    --close-delay: .1s;
+    --fade-in: .5s;
+    --fade-out: .26s;
+    --lit-delay: .12s;
+    --stagger: 18ms;
+
+    display: inline-flex;
+    align-items: baseline;
+    line-height: 1;
+    font-weight: 470;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .wm-word { display: inline-flex; align-items: baseline; }
+
+  .wm-word + .wm-word {
+    margin-left: var(--gap-closed);
+    transition: margin-left var(--dur-close) var(--ease-in-out) var(--close-delay);
+  }
+
+  .wm-a {
+    width: var(--a-w);
+    height: var(--cap);
+    flex: none;
+    color: var(--red);
+    overflow: visible;
+  }
+
+  .wm-tail {
+    display: inline-block;
+    width: 0;
+    /* clip-path instead of overflow:hidden so the baseline stays on the text */
+    clip-path: inset(-.4em 0 -.4em 0);
+    transition: width var(--dur-close) var(--ease-in-out) var(--close-delay);
+  }
+
+  .wm-letters {
+    display: inline-block;
+    width: max-content;
+    padding-left: calc(var(--track) * .9);
+  }
+
+  .wm-letters > span {
+    display: inline-block;
+    letter-spacing: var(--track);
+    opacity: 0;
+    filter: blur(3px);
+    transition:
+      opacity var(--fade-out) var(--ease-soft),
+      filter var(--fade-out) var(--ease-soft);
+  }
+
+  .wm-letters > span:last-child { letter-spacing: 0; }
+
+  .wordmark.is-open .wm-tail {
+    width: var(--w, auto);
+    transition: width var(--dur-open) var(--ease-out);
+  }
+
+  .wordmark.is-open .wm-word + .wm-word {
+    margin-left: var(--gap-open);
+    transition: margin-left var(--dur-open) var(--ease-out);
+  }
+
+  .wordmark.is-lit .wm-letters > span {
+    opacity: 1;
+    filter: blur(0);
+    transition:
+      opacity var(--fade-in) var(--ease-soft) calc(var(--lit-delay) + var(--i) * var(--stagger)),
+      filter var(--fade-in) var(--ease-soft) calc(var(--lit-delay) + var(--i) * var(--stagger));
+  }
+
+  /* collapse without animating (end state on return visits) */
+  .wordmark.no-anim *, .wordmark.no-anim { transition: none !important; }
+</style>

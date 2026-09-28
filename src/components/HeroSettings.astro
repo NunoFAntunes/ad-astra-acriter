@@ -1,0 +1,165 @@
+---
+import { HERO_VARIANTS, type HeroVariant } from '../scripts/hero-variant';
+
+// Review-only switch for the hero video (see scripts/hero-variant.ts).
+const LABELS: Record<HeroVariant, { name: string; note: string }> = {
+  bulb: { name: 'Bulb', note: 'Clip 05' },
+  neck: { name: 'Neck', note: 'Clip 01' },
+};
+
+// Gear outline: teeth on a 24px grid, valleys drawn as arcs.
+const TEETH = 8;
+const R_OUT = 10.5;
+const R_IN = 8;
+const HALF_TOP = 0.15; // tooth half-width in radians, at the tip
+const HALF_BASE = 0.23; // ...and where it meets the body
+const pt = (r: number, a: number) => `${(12 + r * Math.cos(a)).toFixed(2)} ${(12 + r * Math.sin(a)).toFixed(2)}`;
+const GEAR = Array.from({ length: TEETH }, (_, k) => {
+  const a = (k / TEETH) * 2 * Math.PI;
+  const next = ((k + 1) / TEETH) * 2 * Math.PI;
+  return `${k ? 'L' : 'M'}${pt(R_IN, a - HALF_BASE)} L${pt(R_OUT, a - HALF_TOP)} L${pt(R_OUT, a + HALF_TOP)} `
+    + `L${pt(R_IN, a + HALF_BASE)} A${R_IN} ${R_IN} 0 0 1 ${pt(R_IN, next - HALF_BASE)}`;
+}).join(' ') + 'Z';
+---
+
+<div class="hero-settings">
+  <button class="settings-toggle" type="button" popovertarget="settings-panel" aria-label="Settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d={GEAR} />
+      <circle cx="12" cy="12" r="3.25" />
+    </svg>
+  </button>
+
+  <div class="settings-panel" id="settings-panel" popover>
+    <fieldset>
+      <legend>Hero</legend>
+      {HERO_VARIANTS.map((variant, i) => (
+        <label>
+          <input type="radio" name="hero-variant" value={variant} checked={i === 0} />
+          <span class="dot" aria-hidden="true"></span>
+          <span class="name">{LABELS[variant].name}</span>
+          <span class="note">{LABELS[variant].note}</span>
+        </label>
+      ))}
+    </fieldset>
+  </div>
+</div>
+
+<script>
+  import { chooseVariant, isVariant, readVariant } from '../scripts/hero-variant';
+
+  const current = readVariant();
+  document.querySelectorAll<HTMLInputElement>('input[name="hero-variant"]').forEach((radio) => {
+    radio.checked = radio.value === current;
+    radio.addEventListener('change', () => {
+      if (radio.checked && isVariant(radio.value)) chooseVariant(radio.value);
+    });
+  });
+</script>
+
+<style>
+  .hero-settings {
+    position: fixed;
+    right: var(--gutter);
+    bottom: var(--gutter);
+    z-index: 20;
+  }
+
+  .settings-toggle {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin: -8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .4s var(--ease-soft);
+  }
+
+  .settings-toggle:hover,
+  .settings-toggle:focus-visible { color: var(--ink); }
+
+  .settings-toggle svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.1;
+    stroke-linejoin: round;
+    transition: transform .8s var(--ease-out);
+  }
+
+  .settings-toggle:hover svg { transform: rotate(45deg); }
+
+  .settings-panel {
+    position: fixed;
+    inset: auto var(--gutter) calc(var(--gutter) + 40px) auto;
+    margin: 0;
+    padding: 20px 24px 16px;
+    min-width: 220px;
+    border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 450;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--ink) 35%, transparent);
+  }
+
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  legend {
+    padding: 0 0 10px;
+    color: var(--muted);
+  }
+
+  label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .4s var(--ease-soft);
+  }
+
+  label:hover,
+  label:has(:checked) { color: var(--ink); }
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px currentColor;
+    transition: background-color .4s var(--ease-soft), box-shadow .4s var(--ease-soft);
+  }
+
+  :checked ~ .dot {
+    background: var(--red);
+    box-shadow: inset 0 0 0 1px var(--red);
+  }
+
+  .note {
+    margin-left: auto;
+    padding-left: 16px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  label:has(:focus-visible) { outline: 1px solid var(--ink); outline-offset: 4px; }
+</style>

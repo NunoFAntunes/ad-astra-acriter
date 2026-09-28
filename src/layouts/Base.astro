@@ -1,0 +1,37 @@
+---
+import '../styles/global.css';
+import jost from '../assets/fonts/jost.woff2?url';
+import Header from '../components/Header.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Page plays an intro that reveals the header (see Hero). */
+  intro?: boolean;
+}
+
+const {
+  title = 'Ad Astra Acriter',
+  description = 'Ad Astra Acriter — advisory for a changing world.',
+  intro = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#F7F7F5" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href={jost} as="font" type="font/woff2" crossorigin />
+    <slot name="head" />
+    <script is:inline>document.documentElement.classList.add('js')</script>
+  </head>
+  <body>
+    <Header intro={intro} />
+    <slot />
+  </body>
+</html>

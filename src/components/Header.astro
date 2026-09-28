@@ -1,0 +1,187 @@
+---
+import Wordmark from './Wordmark.astro';
+
+interface Props {
+  /** Start hidden and let the page intro fade the header in. */
+  intro?: boolean;
+}
+
+const { intro = false } = Astro.props;
+
+const NAV = [
+  { href: '#philosophy', label: 'Philosophy' },
+  { href: '#advisory', label: 'Advisory' },
+  { href: '#perspectives', label: 'Perspectives' },
+  { href: '#contact', label: 'Contact' },
+];
+---
+
+<header class="site-header" data-intro={intro || undefined}>
+  <a class="site-logo" href="/" aria-label="Ad Astra Acriter — home">
+    <Wordmark />
+  </a>
+
+  <nav class="site-nav" id="site-nav" aria-label="Main">
+    {NAV.map(({ href, label }) => <a href={href}>{label}</a>)}
+  </nav>
+
+  <div class="site-actions">
+    <a class="inquire" href="#inquire"><span class="dot" aria-hidden="true"></span>Inquire</a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+  </div>
+</header>
+
+<script>
+  import { bindHover, watchSize } from '../scripts/wordmark';
+
+  function bindMenu(toggle: HTMLButtonElement, nav: HTMLElement): void {
+    const set = (open: boolean) => {
+      nav.classList.toggle('is-open', open);
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? 'Close' : 'Menu';
+    };
+    toggle.addEventListener('click', () => set(!nav.classList.contains('is-open')));
+    nav.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a')) set(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+  }
+
+  const toggle = document.querySelector<HTMLButtonElement>('.menu-toggle');
+  const nav = document.querySelector<HTMLElement>('#site-nav');
+  if (toggle && nav) bindMenu(toggle, nav);
+
+  const logo = document.querySelector<HTMLElement>('.site-logo');
+  const mark = logo?.querySelector<HTMLElement>('[data-wordmark]');
+  if (logo && mark) {
+    document.fonts.ready.then(() => {
+      watchSize(mark);
+      bindHover(logo, mark);
+    });
+  }
+</script>
+
+<style>
+  .site-header {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 var(--gutter);
+    font-size: 13px;
+    font-weight: 450;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+  }
+
+  /* Intro: hidden until the hero script adds .is-in. Without JS it stays visible. */
+  .site-header[data-intro] { transition: opacity 1.6s var(--ease-soft); }
+  :global(.js) .site-header[data-intro]:not(.is-in) { opacity: 0; }
+
+  .site-logo {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    /* generous hit area without shifting the mark */
+    padding: 12px 12px 12px 0;
+    margin: -12px 0;
+    font-size: clamp(22px, 1.85vw, 30px);
+    letter-spacing: 0;
+  }
+
+  .site-logo :global(.wordmark) {
+    --track: .24em;
+    --gap-open: .5em;
+  }
+
+  .site-nav {
+    display: flex;
+    gap: clamp(28px, 4vw, 72px);
+  }
+
+  .site-nav a,
+  .inquire {
+    position: relative;
+    padding: 8px 0;
+    color: var(--muted);
+    transition: color .4s var(--ease-soft);
+  }
+
+  .site-nav a:hover,
+  .site-nav a:focus-visible,
+  .inquire:hover,
+  .inquire:focus-visible { color: var(--ink); }
+
+  .site-actions {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .inquire {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--ink);
+    /* balance the trailing letter-spacing */
+    margin-right: -.3em;
+  }
+
+  .inquire .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: transform .5s var(--ease-out);
+  }
+
+  .inquire:hover .dot { transform: scale(1.35); }
+
+  .menu-toggle {
+    display: none;
+    appearance: none;
+    border: 0;
+    background: none;
+    padding: 8px 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  @media (max-width: 1280px) {
+    .site-header { grid-template-columns: 1fr auto; }
+
+    .site-nav {
+      position: fixed;
+      inset: var(--header-h) 0 auto 0;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      padding: 24px var(--gutter) 40px;
+      background: var(--bg);
+      font-size: 14px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-6px);
+      transition:
+        opacity .5s var(--ease-soft),
+        transform .6s var(--ease-out),
+        visibility 0s linear .6s;
+    }
+
+    .site-nav a { padding: 16px 0; }
+
+    .site-nav.is-open {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      transition:
+        opacity .5s var(--ease-soft),
+        transform .6s var(--ease-out);
+    }
+
+    .menu-toggle { display: block; }
+  }
+</style>

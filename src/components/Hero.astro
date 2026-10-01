@@ -185,6 +185,10 @@ const SOURCES: ReelSources = {
 
   .reel-controls[hidden] { display: none; }
 
+  /* No skip for now: the button (still wired up in reel.ts) only shows once
+     the reel has ended, as Replay / Play intro. Drop this rule to bring Skip back. */
+  .hero:not([data-state="ended"]) .reel-control { display: none; }
+
   .reel-control,
   .reel-mute {
     position: relative;

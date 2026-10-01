@@ -1,10 +1,15 @@
 ---
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
+import FontLab from '../components/FontLab.astro';
 import poster from '../assets/hero/first.jpg';
+
+// The font lab is for client previews only (dev server and the GitHub Pages build).
+const production = !import.meta.env.DEV && Astro.site?.hostname === 'aaastrategy.eu';
 ---
 
 <Base intro>
   <link slot="head" rel="preload" href={poster.src} as="image" />
   <Hero />
+  {!production && <FontLab />}
 </Base>

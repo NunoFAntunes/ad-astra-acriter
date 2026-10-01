@@ -14,7 +14,7 @@ Steps:
   5. prepare the soundtrack from videos/audio-6s.mp3, which swells from
      silence to a steady patter: play it once, then carry that patter on
      unbroken for the rest of the reel (see bed()), lift its level and fade
-     it out with the closing clip
+     it out so it is silent as the last beads come to rest (SOUND_STOP)
 
 One file instead of eight keeps playback gapless on every browser, and lets
 the page time its text off video.currentTime.
@@ -68,6 +68,10 @@ SHARPEN = "cas=0.35"  # contrast-adaptive, so flat areas don't get noisier
 SOUND_IN = SRC / "audio-6s.mp3"
 SOUND_PEAK = -6.0       # dBFS; the source peaks around -18
 SOUND_FADE = 3.0        # s, fade-out as the last clip settles
+# The beads in the last clip stop falling this many seconds into the source
+# clip; the soundtrack has faded out by then. It stays full length (silent
+# after the fade) so the audio element never ends ahead of the picture.
+SOUND_STOP = (8, 5.92)  # (clip, s into the source clip)
 # The patter that carries on after the swell is cut from the steady end of
 # the source (its last ~2.5 s). Each take starts a little apart, plays a
 # touch higher or lower and may swap channels, so the overlapping takes
@@ -214,7 +218,7 @@ def bed(duration):
     return ";".join(graph)
 
 
-def sound(dest, duration):
+def sound(dest, duration, stop):
     with tempfile.TemporaryDirectory() as tmp:
         raw = Path(tmp) / "bed.wav"
         run("-i", str(SOUND_IN), "-filter_complex", bed(duration), "-map", "[bed]", str(raw))
@@ -223,7 +227,7 @@ def sound(dest, duration):
             check=True, capture_output=True, text=True,
         ).stderr
         peak = float(out.split("max_volume:")[1].split("dB")[0])
-        af = f"volume={SOUND_PEAK - peak:.2f}dB,afade=t=out:st={duration - SOUND_FADE:.3f}:d={SOUND_FADE}"
+        af = f"volume={SOUND_PEAK - peak:.2f}dB,afade=t=out:st={stop - SOUND_FADE:.3f}:d={SOUND_FADE}"
         run("-i", str(raw), "-af", af, "-c:a", "libmp3lame", "-b:a", "128k", str(dest))
 
 
@@ -253,7 +257,10 @@ def main():
         encode(master, "reel-portrait", PORTRAIT_CROP)
         still(master, 0, OUT / "first.jpg")
         still(master, frames - 1, OUT / "last.jpg")
-    sound(OUT / "sound.mp3", frames * FRAME)
+    stop_clip, stop_at = SOUND_STOP
+    speed = dict(SEGMENTS)[stop_clip]
+    stop = spans[[c for c, _ in SEGMENTS].index(stop_clip)][0] + stop_at / speed
+    sound(OUT / "sound.mp3", frames * FRAME, stop)
 
     timeline = {
         "duration": round(frames * FRAME, 3),

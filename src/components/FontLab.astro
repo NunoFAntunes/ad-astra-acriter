@@ -1,0 +1,400 @@
+---
+import { FONTS } from '../scripts/font-lab';
+
+// Client preview of hero typefaces (see scripts/font-lab.ts). Dormant until
+// the URL has ?fonts; pages leave it out of the production build.
+---
+
+<div class="font-lab" data-font-lab hidden>
+  <div class="fl-panel">
+    <div class="fl-meta" aria-live="polite">
+      <span class="fl-count"></span>
+      <span class="fl-kind"></span>
+      <span class="fl-note"></span>
+    </div>
+
+    <div class="fl-wheel">
+      <button class="fl-step" type="button" data-step="-1" aria-label="Previous font">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
+      </button>
+      <div class="fl-track" role="listbox" aria-label="Hero typeface" tabindex="0">
+        {FONTS.map(({ id, name, family, weight }) => (
+          <button class="fl-item" type="button" role="option" data-id={id} style={`font-family:'${family}',Jost,sans-serif;font-weight:${weight}`}>{name}</button>
+        ))}
+      </div>
+      <button class="fl-step" type="button" data-step="1" aria-label="Next font">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6" /></svg>
+      </button>
+    </div>
+
+    <div class="fl-tools">
+      <button class="fl-tool" type="button" data-pin aria-pressed="true">Hold text</button>
+      <button class="fl-tool" type="button" data-collapse>Hide</button>
+    </div>
+  </div>
+
+  <button class="fl-open" type="button" data-collapse aria-label="Show font picker">Aa</button>
+</div>
+
+<script>
+  import { FONTS, fontSources, type LabFont } from '../scripts/font-lab';
+
+  const PARAM = 'fonts';
+  const SETTLE = 140; // ms of scroll silence that counts as the wheel coming to rest
+  const DETENT = 60; // px of mouse-wheel travel per font
+
+  function loadFonts(): void {
+    const { stylesheets, faces } = fontSources();
+    for (const href of stylesheets) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.append(link);
+    }
+    const style = document.createElement('style');
+    style.textContent = faces;
+    document.head.append(style);
+  }
+
+  // Jost is what the hero is styled for, so it simply drops the overrides.
+  function applyFont(lines: HTMLElement[], font: LabFont): void {
+    for (const line of lines) {
+      const s = line.style;
+      s.fontFamily = font.load ? `"${font.family}", Jost, sans-serif` : '';
+      s.fontWeight = font.load ? String(font.weight) : '';
+      s.letterSpacing = font.load ? font.tracking ?? '0' : '';
+      s.fontSize = font.scale ? `${font.scale}em` : '';
+    }
+  }
+
+  function bindLab(lab: HTMLElement, hero: HTMLElement): void {
+    const track = lab.querySelector<HTMLElement>('.fl-track')!;
+    const items = [...track.querySelectorAll<HTMLButtonElement>('.fl-item')];
+    const lines = [...hero.querySelectorAll<HTMLElement>('.line')];
+    const count = lab.querySelector<HTMLElement>('.fl-count')!;
+    const kind = lab.querySelector<HTMLElement>('.fl-kind')!;
+    const note = lab.querySelector<HTMLElement>('.fl-note')!;
+    const pin = lab.querySelector<HTMLButtonElement>('[data-pin]')!;
+
+    const wanted = new URLSearchParams(location.search).get(PARAM);
+    let current = Math.max(0, FONTS.findIndex((f) => f.id === wanted));
+    let steering = false; // a click or key is driving the scroll
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    let frame = 0;
+
+    const centreOf = (item: HTMLElement) => item.offsetLeft + item.offsetWidth / 2;
+    const viewCentre = () => track.scrollLeft + track.clientWidth / 2;
+
+    const nearest = () => {
+      const c = viewCentre();
+      let best = 0;
+      items.forEach((item, i) => {
+        if (Math.abs(centreOf(item) - c) < Math.abs(centreOf(items[best]) - c)) best = i;
+      });
+      return best;
+    };
+
+    // Items turn away and fade with distance from the centre, like a drum.
+    const paint = () => {
+      frame = 0;
+      const c = viewCentre();
+      const half = track.clientWidth / 2;
+      for (const item of items) {
+        const d = Math.max(-1, Math.min(1, (centreOf(item) - c) / half));
+        item.style.opacity = String(1 - Math.abs(d) * .8);
+        item.style.transform = `rotateY(${d * 38}deg) scale(${1 - Math.abs(d) * .22})`;
+      }
+    };
+
+    const show = (i: number) => {
+      current = i;
+      const font = FONTS[i];
+      applyFont(lines, font);
+      items.forEach((item, k) => item.setAttribute('aria-selected', String(k === i)));
+      count.textContent = `${String(i + 1).padStart(2, '0')} / ${String(FONTS.length).padStart(2, '0')}`;
+      kind.textContent = `${font.kind} · ${font.source}`;
+      note.textContent = font.note;
+      const url = new URL(location.href);
+      url.searchParams.set(PARAM, font.id);
+      history.replaceState(history.state, '', url);
+    };
+
+    const centre = (i: number, behavior: ScrollBehavior = 'smooth') => {
+      track.scrollTo({ left: centreOf(items[i]) - track.clientWidth / 2, behavior });
+    };
+
+    const go = (i: number) => {
+      const next = Math.max(0, Math.min(FONTS.length - 1, i));
+      if (next === current) return;
+      steering = true;
+      show(next);
+      centre(next);
+    };
+
+    track.addEventListener('scroll', () => {
+      if (!frame) frame = requestAnimationFrame(paint);
+      // Spinning by hand changes the font as each name passes the centre.
+      if (!steering) {
+        const i = nearest();
+        if (i !== current) show(i);
+      }
+      clearTimeout(settle);
+      settle = setTimeout(() => { steering = false; }, SETTLE);
+    }, { passive: true });
+
+    // A mouse wheel turns it one notch at a time.
+    let travel = 0;
+    track.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      travel += e.deltaY;
+      if (Math.abs(travel) < DETENT) return;
+      go(current + Math.sign(travel));
+      travel = 0;
+    }, { passive: false });
+
+    items.forEach((item, i) => item.addEventListener('click', () => go(i)));
+    lab.querySelectorAll<HTMLButtonElement>('[data-step]').forEach((btn) => {
+      btn.addEventListener('click', () => go(current + Number(btn.dataset.step)));
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || lab.classList.contains('is-collapsed')) return;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        go(current + (e.key === 'ArrowLeft' ? -1 : 1));
+      }
+    });
+
+    // Keep the words on screen while comparing; off lets the reel play as built.
+    const setPin = (on: boolean) => {
+      hero.toggleAttribute('data-font-pin', on);
+      pin.setAttribute('aria-pressed', String(on));
+    };
+    pin.addEventListener('click', () => setPin(pin.getAttribute('aria-pressed') !== 'true'));
+    setPin(true);
+
+    lab.querySelectorAll('[data-collapse]').forEach((btn) => {
+      btn.addEventListener('click', () => lab.classList.toggle('is-collapsed'));
+    });
+
+    // Names change width as their fonts arrive, so re-centre when they do.
+    new ResizeObserver(() => { centre(current, 'instant'); paint(); }).observe(track);
+    document.fonts.ready.then(() => { centre(current, 'instant'); paint(); });
+
+    lab.hidden = false;
+    show(current);
+    centre(current, 'instant');
+    paint();
+  }
+
+  const lab = document.querySelector<HTMLElement>('[data-font-lab]');
+  const hero = document.querySelector<HTMLElement>('.hero');
+  if (lab && hero && new URLSearchParams(location.search).has(PARAM)) {
+    loadFonts();
+    bindLab(lab, hero);
+  }
+</script>
+
+<style>
+  .font-lab {
+    position: fixed;
+    left: 50%;
+    bottom: var(--gutter);
+    z-index: 20;
+    width: min(720px, calc(100vw - 2 * var(--gutter)));
+    transform: translateX(-50%);
+    color: #fff;
+  }
+
+  .font-lab[hidden] { display: none; }
+
+  /* Same tinted glass as the reel's buttons. */
+  .fl-panel,
+  .fl-open {
+    border: 1px solid rgb(255 255 255 / .22);
+    background: rgb(22 10 8 / .55);
+    -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+  }
+
+  .fl-panel {
+    display: grid;
+    gap: 10px;
+    padding: 14px 14px 12px;
+    border-radius: 22px;
+  }
+
+  .fl-meta,
+  .fl-tools {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 450;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+  }
+
+  .fl-count {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fl-kind {
+    min-width: 0;
+    overflow: hidden;
+    color: rgb(255 255 255 / .65);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fl-note {
+    margin-left: auto;
+    overflow: hidden;
+    color: rgb(255 255 255 / .65);
+    font-size: 12px;
+    letter-spacing: .02em;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  .fl-wheel {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+  }
+
+  .fl-track {
+    position: relative;
+    display: flex;
+    gap: 6px;
+    padding: 6px 50%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    perspective: 700px;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  }
+
+  .fl-track::-webkit-scrollbar { display: none; }
+  .fl-track:focus-visible { outline: 1px solid rgb(255 255 255 / .6); outline-offset: 2px; }
+
+  .fl-item {
+    flex: none;
+    scroll-snap-align: center;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: inherit;
+    font-size: 24px;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color .4s var(--ease-soft);
+  }
+
+  .fl-item[aria-selected="true"] { background: rgb(255 255 255 / .12); }
+
+  .fl-step,
+  .fl-tool,
+  .fl-open {
+    appearance: none;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .fl-step {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transition: background-color .3s var(--ease-soft);
+  }
+
+  .fl-step:hover,
+  .fl-step:focus-visible { background: rgb(255 255 255 / .12); }
+
+  .fl-step svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .fl-tools { justify-content: center; gap: 22px; }
+
+  .fl-tool {
+    padding: 4px 0;
+    color: rgb(255 255 255 / .6);
+    font-size: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    transition: color .3s var(--ease-soft);
+  }
+
+  .fl-tool:hover,
+  .fl-tool:focus-visible,
+  .fl-tool[aria-pressed="true"] { color: #fff; }
+
+  .fl-tool[aria-pressed]::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 9px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    vertical-align: .1em;
+  }
+
+  .fl-tool[aria-pressed="true"]::before { border-color: var(--red); background: var(--red); }
+
+  /* Collapsed: just a small tab, so the hero can be seen clean. */
+  .fl-open {
+    display: none;
+    margin: 0 auto;
+    width: 52px;
+    height: 44px;
+    border: 1px solid rgb(255 255 255 / .22);
+    border-radius: 999px;
+    font-size: 17px;
+  }
+
+  .font-lab.is-collapsed { width: auto; }
+  .font-lab.is-collapsed .fl-panel { display: none; }
+  .font-lab.is-collapsed .fl-open { display: block; }
+
+  /* Narrow screens: clear the reel's own buttons, and drop the long note. */
+  @media (max-width: 1000px) {
+    .font-lab { bottom: calc(var(--gutter) + 56px); }
+  }
+
+  @media (max-width: 600px) {
+    .fl-note { display: none; }
+    .fl-meta { justify-content: space-between; }
+    .fl-item { font-size: 20px; }
+  }
+
+  /* Holding the text: both lines stacked and steady, the name out of the way. */
+  :global(html .hero[data-font-pin] .stage > .line) {
+    grid-area: auto;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  :global(html .hero[data-font-pin] .stage > .wordmark) { display: none; }
+  :global(html .hero[data-font-pin] .reel-veil) { opacity: 1; }
+</style>

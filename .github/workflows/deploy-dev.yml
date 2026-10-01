@@ -1,4 +1,5 @@
 # dev branch -> GitHub Pages preview, https://nunofantunes.github.io/ad-astra-acriter/
+# and Cloudflare Pages, https://aaa.tierney.one
 # The build carries noindex so the preview stays out of search results.
 name: Deploy dev
 
@@ -45,3 +46,25 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Needs secrets CLOUDFLARE_API_TOKEN (Pages: Edit) and CLOUDFLARE_ACCOUNT_ID,
+  # and optionally the variable CLOUDFLARE_PAGES_PROJECT (default ad-astra-acriter).
+  # The Pages project's production branch must be "main" (or change --branch),
+  # and aaa.tierney.one must be its custom domain.
+  cloudflare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          SITE_URL: https://aaa.tierney.one
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT || 'ad-astra-acriter' }} --branch=main

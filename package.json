@@ -8,13 +8,15 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "astro": "astro"
+    "astro": "astro",
+    "deploy:ovh": "npm run build && bash tools/deploy-ovh.sh"
   },
   "dependencies": {
     "astro": "^7.3.5"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@types/node": "^24.19.0",
     "typescript": "^6.0.3"
   }
 }

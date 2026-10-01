@@ -15,6 +15,10 @@ const {
   description = 'Ad Astra Acriter — advisory for a changing world.',
   intro = false,
 } = Astro.props;
+
+// Only the production site belongs in search results; the GitHub Pages
+// preview is kept out of them.
+const indexable = Astro.site?.hostname === 'aaastrategy.eu';
 ---
 
 <!doctype html>
@@ -25,7 +29,10 @@ const {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#F7F7F5" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {indexable
+      ? <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+      : <meta name="robots" content="noindex" />}
+    <link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg`} type="image/svg+xml" />
     <link rel="preload" href={jost} as="font" type="font/woff2" crossorigin />
     <slot name="head" />
     <script is:inline>document.documentElement.classList.add('js')</script>

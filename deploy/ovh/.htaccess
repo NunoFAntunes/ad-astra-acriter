@@ -1,0 +1,31 @@
+# Apache config for the OVH web hosting. tools/deploy-ovh.sh copies it into
+# the build, so it only ships to production (GitHub Pages has no Apache).
+
+Options -Indexes
+AddType font/woff2 .woff2
+
+# One address for the site: https://aaastrategy.eu. Port 80 is how OVH's
+# load balancer shows plain HTTP. Certificate renewals stay reachable.
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/\.well-known/
+RewriteCond %{SERVER_PORT} 80 [OR]
+RewriteCond %{HTTP_HOST} ^www\. [NC]
+RewriteRule ^ https://aaastrategy.eu%{REQUEST_URI} [L,R=301]
+
+<IfModule mod_headers.c>
+  # Astro fingerprints everything under /_astro/, so it can be kept for good;
+  # pages are rechecked on every visit so a deploy shows up at once.
+  <If "%{REQUEST_URI} =~ m#^/_astro/#">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+  <Else>
+    Header set Cache-Control "no-cache"
+  </Else>
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>

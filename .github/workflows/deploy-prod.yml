@@ -1,0 +1,42 @@
+# prod branch -> OVH web hosting, https://aaastrategy.eu
+# Credentials live in the "production" environment, which only prod may use.
+# To roll back, re-run the deploy of an earlier commit from the Actions tab.
+name: Deploy prod
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/prod'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://aaastrategy.eu
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+      - run: npm ci
+      - run: npm run build
+      - run: bash tools/deploy-ovh.sh
+        env:
+          OVH_SFTP_HOST: ${{ vars.OVH_SFTP_HOST }}
+          OVH_SFTP_PORT: ${{ vars.OVH_SFTP_PORT }}
+          OVH_SFTP_USER: ${{ vars.OVH_SFTP_USER }}
+          OVH_REMOTE_DIR: ${{ vars.OVH_REMOTE_DIR }}
+          OVH_SFTP_PASSWORD: ${{ secrets.OVH_SFTP_PASSWORD }}
+      - name: Check the live site
+        run: curl -fsS https://aaastrategy.eu/ | grep -q 'rel="canonical"'

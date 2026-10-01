@@ -1,30 +1,30 @@
 ---
 import Wordmark from './Wordmark.astro';
-import bulbWebm from '../assets/hourglass.webm';
-import bulbMp4 from '../assets/hourglass.mp4';
-import bulbPoster from '../assets/hourglass-poster.jpg';
-import neckWebm from '../assets/hourglass-neck.webm';
-import neckMp4 from '../assets/hourglass-neck.mp4';
-import neckPoster from '../assets/hourglass-neck-poster.jpg';
-import type { HeroSources, HeroVariant } from '../scripts/hero-variant';
+import reelAv1 from '../assets/hero/reel-av1.mp4';
+import reelH264 from '../assets/hero/reel.mp4';
+import portraitAv1 from '../assets/hero/reel-portrait-av1.mp4';
+import portraitH264 from '../assets/hero/reel-portrait.mp4';
+import sound from '../assets/hero/sound.mp3';
+import first from '../assets/hero/first.jpg';
+import last from '../assets/hero/last.jpg';
+import type { ReelSources } from '../scripts/reel';
 
-// Variants under review (switched from HeroSettings). The first is the default
-// and what renders without JS; each has a matching mask in the styles below.
-const SOURCES: Record<HeroVariant, HeroSources> = {
-  bulb: { webm: bulbWebm, mp4: bulbMp4, poster: bulbPoster.src },
-  neck: { webm: neckWebm, mp4: neckMp4, poster: neckPoster.src },
+// The reel (tools/hero_reel.py) is picked and started by scripts/reel.ts.
+// Without JS the closing still is all that shows.
+const SOURCES: ReelSources = {
+  landscape: { av1: reelAv1, h264: reelH264 },
+  portrait: { av1: portraitAv1, h264: portraitH264 },
 };
-const { bulb } = SOURCES;
 ---
 
 <main class="hero">
   <h1 class="sr-only">Ad Astra Acriter</h1>
 
-  <div class="hourglass" data-variant="bulb" data-sources={JSON.stringify(SOURCES)} aria-hidden="true">
-    <video muted loop playsinline autoplay preload="auto" poster={bulb.poster} width="1280" height="720">
-      <source src={bulb.webm} type="video/webm" />
-      <source src={bulb.mp4} type="video/mp4" />
-    </video>
+  <div class="reel" aria-hidden="true">
+    <img class="reel-still" src={last.src} width={last.width} height={last.height} alt="" decoding="async" />
+    <video class="reel-video" muted playsinline preload="none" poster={first.src} data-sources={JSON.stringify(SOURCES)}></video>
+    <div class="reel-veil"></div>
+    <audio class="reel-sound" preload="auto" src={sound}></audio>
   </div>
 
   <div class="stage">
@@ -32,141 +32,238 @@ const { bulb } = SOURCES;
     <p class="line" data-line="2">We must rethink</p>
     <Wordmark open data-hero-mark />
   </div>
+
+  <div class="reel-controls" hidden>
+    <button class="reel-mute is-gone" type="button" aria-label="Sound" aria-pressed="true" title="Mute">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 9.5h3.2L11.5 6v12l-4.3-3.5H4Z" />
+        <path class="on" d="M14.8 9.6a3.4 3.4 0 0 1 0 4.8M17.3 7.1a7 7 0 0 1 0 9.8" />
+        <path class="off" d="m15 9.8 4.4 4.4m0-4.4L15 14.2" />
+      </svg>
+    </button>
+    <button class="reel-control" type="button">
+      <span class="reel-control-label">Skip intro</span>
+    </button>
+  </div>
 </main>
 
 <script>
-  import { bindHeroVariant } from '../scripts/hero-variant';
-  import { runIntro } from '../scripts/intro';
+  import { runReel } from '../scripts/reel';
 
-  const hourglass = document.querySelector<HTMLElement>('.hourglass');
-  if (hourglass) bindHeroVariant(hourglass);
-  runIntro();
+  runReel();
 </script>
 
 <style>
   .hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(20px, 3.5vh, 44px);
-    padding: 0 var(--gutter) calc(var(--header-h) * .8);
-    min-width: 0;
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: calc(100svh - var(--header-h));
+    padding: var(--gutter);
+    overflow: hidden;
+    /* shows while the poster loads; close to the footage's dominant tone */
+    background: #3a2422;
+    color: #fff;
+    isolation: isolate;
   }
 
-  .hourglass {
-    width: min(88vw, 760px, (100svh - var(--header-h) - 260px) * 16 / 9);
-    min-width: 260px;
-    aspect-ratio: 16 / 9;
+  /* Reel: video over its closing still, so the hand-off at the end is seamless. */
+
+  .reel,
+  .reel > * {
+    position: absolute;
+    inset: 0;
   }
 
-  .hourglass video {
-    display: block;
+  .reel { z-index: -1; }
+
+  .reel-still,
+  .reel-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    -webkit-mask-image: url("../assets/hourglass-mask.png");
-            mask-image: url("../assets/hourglass-mask.png");
-    -webkit-mask-size: 100% 100%;
-            mask-size: 100% 100%;
-    -webkit-mask-repeat: no-repeat;
-            mask-repeat: no-repeat;
   }
 
-  .hourglass[data-variant="neck"] video {
-    -webkit-mask-image: url("../assets/hourglass-neck-mask.png");
-            mask-image: url("../assets/hourglass-neck-mask.png");
+  .reel-video {
+    opacity: 0;
+    transition: opacity 1s var(--ease-soft);
   }
+
+  :global(.js) .reel-video { opacity: 1; }
+  :global(.js) .hero[data-state="ended"] .reel-video { opacity: 0; }
+
+  /* Darkens the footage behind the words so white text keeps its contrast;
+     only up while something is on screen, so the clips stay true otherwise. */
+  .reel-veil {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 50%, rgb(22 10 8 / .4), rgb(22 10 8 / .14) 70%, rgb(22 10 8 / .06)),
+      rgb(22 10 8 / .08);
+    opacity: 0;
+    transition: opacity 1.6s var(--ease-soft);
+  }
+
+  .hero.has-text .reel-veil { opacity: 1; }
+
+  /* Words */
 
   .stage {
     display: grid;
     place-items: center;
-    min-height: 2.4em;
-    font-size: clamp(22px, 2.6vw, 36px);
+    max-width: 100%;
+    font-size: clamp(32px, 4.6vw + 14px, 84px);
+    text-shadow: 0 1px 2px rgb(22 10 8 / .25), 0 2px 28px rgb(22 10 8 / .35);
   }
 
   .stage > * { grid-area: 1 / 1; }
 
   .line {
     margin: 0;
-    /* the lines share the mark's grid cell; keep them from blocking its hover */
-    pointer-events: none;
-    user-select: none;
-    font-weight: 330;
-    letter-spacing: .02em;
+    font-weight: 380;
+    letter-spacing: .015em;
+    line-height: 1.1;
     text-align: center;
+    text-wrap: balance;
+    user-select: none;
   }
 
   .stage :global(.wordmark) {
     --track: .26em;
     --gap-open: .5em;
-    font-size: min(1.25em, 5.6vw);
-    position: relative;
-    cursor: default;
-    user-select: none;
-  }
-
-  /* The collapsed ΛΛΛ is a small target; pad the hover area without moving it. */
-  .stage :global(.wordmark)::before {
-    content: '';
-    position: absolute;
-    inset: -.5em -.6em;
-  }
-
-  /* Intro choreography (classes toggled by scripts/intro.ts). Without JS,
-     the end state is shown. */
-
-  :global(.js) .hourglass,
-  :global(.js) .line,
-  :global(.js) .stage :global(.wordmark) {
-    opacity: 0;
-  }
-
-  .hourglass {
-    transform: scale(1.015);
-    transition:
-      opacity 2.2s var(--ease-soft),
-      transform 3.2s var(--ease-out);
-  }
-
-  .line {
-    transform: translateY(10px);
-    filter: blur(6px);
-    transition:
-      opacity 1.3s var(--ease-soft),
-      transform 1.6s var(--ease-out),
-      filter 1.3s var(--ease-soft);
-  }
-
-  .line.is-out {
-    transform: translateY(-6px);
-    filter: blur(5px);
-    transition-duration: 1s, 1.1s, 1s;
-  }
-
-  .stage :global(.wordmark) {
     --dur-close: 1.7s;
     --close-delay: .45s;
     --fade-in: 1s;
     --fade-out: .8s;
     --lit-delay: .35s;
     --stagger: 55ms;
-    transition: opacity 1.4s var(--ease-soft);
+    /* "AD ASTRA ACRITER" is ~11.5em wide once open; keep it inside the gutters */
+    font-size: min(.9em, 7.4vw);
+    user-select: none;
   }
 
-  :global(.js) .hourglass.is-in,
-  :global(.js) .line.is-in,
-  :global(.js) .stage :global(.wordmark.is-in) { opacity: 1; }
+  /* Red Λ on red beads disappears, so the mark is white on the reel. */
+  .stage :global(.wm-a) {
+    color: inherit;
+    filter: drop-shadow(0 2px 18px rgb(22 10 8 / .35));
+  }
 
-  .hourglass.is-in,
-  .line.is-in { transform: none; filter: blur(0); }
+  /* Choreography (classes set from the reel's clock by scripts/reel.ts). */
 
-  /* Variant switch (scripts/hero-variant.ts): quick fade out, then the
-     usual slow fade back in once the new clip has a frame. */
-  :global(.js) .hourglass.is-in.is-swapping {
+  .line,
+  .stage :global(.wordmark) { opacity: 0; }
+
+  .line {
+    transform: translateY(12px);
+    filter: blur(8px);
+    transition:
+      opacity 1.3s var(--ease-soft),
+      transform 1.8s var(--ease-out),
+      filter 1.3s var(--ease-soft);
+  }
+
+  .stage :global(.wordmark) { transition: opacity 1.2s var(--ease-soft); }
+
+  .line.is-in { opacity: 1; transform: none; filter: blur(0); }
+  .stage :global(.wordmark.is-in) { opacity: 1; }
+
+  .line.is-in.is-out {
     opacity: 0;
-    transition-duration: .45s;
+    transform: translateY(-8px);
+    filter: blur(6px);
+    transition-duration: 1s, 1.1s, 1s;
   }
 
-  .line.is-in.is-out { opacity: 0; transform: translateY(-6px); filter: blur(5px); }
+  /* Skip / replay. A tinted, blurred pill so it reads on pale and dark frames
+     alike; the fill behind the label tracks the reel's progress. */
+
+  .reel-controls {
+    position: absolute;
+    right: var(--gutter);
+    bottom: var(--gutter);
+    display: flex;
+    gap: 10px;
+  }
+
+  .reel-controls[hidden] { display: none; }
+
+  .reel-control,
+  .reel-mute {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 22px;
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / .22);
+    border-radius: 999px;
+    background: rgb(22 10 8 / .55);
+    -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 450;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color .4s var(--ease-soft), border-color .4s var(--ease-soft);
+  }
+
+  .reel-control::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgb(255 255 255 / .14);
+    transform: scaleX(var(--progress, 0));
+    transform-origin: left;
+  }
+
+  .reel-control:hover,
+  .reel-control:focus-visible,
+  .reel-mute:hover,
+  .reel-mute:focus-visible {
+    background: rgb(22 10 8 / .72);
+    border-color: rgb(255 255 255 / .45);
+  }
+
+  .reel-control:focus-visible,
+  .reel-mute:focus-visible { outline: 1px solid #fff; outline-offset: 4px; }
+
+  /* Sound toggle: same pill, round. Shown only while the soundtrack runs. */
+  .reel-mute {
+    justify-content: center;
+    width: 44px;
+    padding: 0;
+    transition:
+      background-color .4s var(--ease-soft),
+      border-color .4s var(--ease-soft),
+      opacity .6s var(--ease-soft),
+      visibility 0s;
+  }
+
+  .reel-mute.is-gone {
+    opacity: 0;
+    visibility: hidden;
+    transition-delay: 0s, 0s, 0s, .6s;
+  }
+
+  .reel-mute svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .reel-mute[aria-pressed="true"] .off,
+  .reel-mute[aria-pressed="false"] .on { display: none; }
+
+  .reel-control-label {
+    position: relative;
+    /* balance the trailing letter-spacing */
+    margin-right: -.28em;
+  }
+
+  .hero[data-state="ended"] .reel-control::before { transform: scaleX(0); }
 </style>

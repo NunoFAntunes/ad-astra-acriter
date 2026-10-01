@@ -1,12 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
 import Hero from '../components/Hero.astro';
-import HeroSettings from '../components/HeroSettings.astro';
-import poster from '../assets/hourglass-poster.jpg';
+import poster from '../assets/hero/first.jpg';
 ---
 
 <Base intro>
   <link slot="head" rel="preload" href={poster.src} as="image" />
   <Hero />
-  <HeroSettings />
 </Base>

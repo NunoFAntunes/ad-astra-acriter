@@ -2,8 +2,9 @@ import timeline from './hero-reel.json';
 import { watchSize } from './wordmark';
 
 // The hero reel is one video (built by tools/hero_reel.py); its words and
-// soundtrack are timed off video.currentTime, so they stay with the footage
-// through buffering, tab switches and skips.
+// soundtrack (one continuous track as long as the reel) are timed off
+// video.currentTime, so they stay with the footage through buffering, tab
+// switches and skips.
 
 interface Rendition { av1: string; h264: string }
 export interface ReelSources { landscape: Rendition; portrait: Rendition }
@@ -36,6 +37,7 @@ const CUES = (() => {
 // refuse to start it without a click, in which case the toggle shows it off.
 const SOUND_KEY = 'aaa:sound';
 const SOUND_DRIFT = 0.3; // s the soundtrack may wander from the picture
+const SOUND_RELEASE = 600; // ms the soundtrack takes to die away when cut short
 
 function readSoundPref(): boolean {
   try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch { return true; }
@@ -123,15 +125,12 @@ export function runReel(): void {
 
   const setState = (state: 'loading' | 'playing' | 'ended') => { hero.dataset.state = state; };
 
-  // The soundtrack is shorter than the reel and plays once from the top.
-  const soundLeft = () => !(video.currentTime >= audio.duration - 0.05);
-
   const showSound = () => {
     if (mute.getAttribute('aria-pressed') !== String(soundOn)) {
       mute.setAttribute('aria-pressed', String(soundOn));
       mute.title = soundOn ? 'Mute' : 'Unmute';
     }
-    mute.classList.toggle('is-gone', hero.dataset.state === 'ended' || !soundLeft());
+    mute.classList.toggle('is-gone', hero.dataset.state === 'ended');
   };
 
   const refused = (e: unknown) => {
@@ -142,13 +141,35 @@ export function runReel(): void {
     }
   };
 
+  // Let the soundtrack die away rather than cut it off (on a skip or mute).
+  // iOS ignores volume, so there it just stops at the end of the release.
+  let release = 0;
+  const unrelease = () => {
+    cancelAnimationFrame(release);
+    release = 0;
+    audio.volume = 1;
+  };
+  const fadeSound = () => {
+    if (audio.paused || release) return;
+    const from = audio.volume;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min((now - t0) / SOUND_RELEASE, 1);
+      audio.volume = from * (1 - k) ** 2;
+      if (k < 1) release = requestAnimationFrame(step);
+      else { audio.pause(); unrelease(); }
+    };
+    release = requestAnimationFrame(step);
+  };
+
   // Play, pause or re-align the soundtrack to match the picture.
   const syncSound = () => {
-    const want = soundOn && hero.dataset.state !== 'ended' && !video.paused && !stalled && soundLeft();
+    const want = soundOn && hero.dataset.state !== 'ended' && !video.paused && !stalled;
     if (!want) {
-      if (!audio.paused) audio.pause();
+      if (!audio.paused && !release) audio.pause();
       return;
     }
+    if (release) unrelease();
     if (Math.abs(audio.currentTime - video.currentTime) > SOUND_DRIFT) audio.currentTime = video.currentTime;
     if (audio.paused) audio.play().catch(refused);
   };
@@ -157,7 +178,8 @@ export function runReel(): void {
   // unlock audio for play() calls made right there, so call it now and let
   // syncSound pause it again if the picture isn't running yet.
   const primeSound = () => {
-    if (!soundOn || !soundLeft()) return;
+    if (!soundOn) return;
+    unrelease();
     audio.currentTime = video.currentTime;
     audio.play().then(syncSound, refused);
   };
@@ -175,7 +197,7 @@ export function runReel(): void {
     cancelAnimationFrame(frame);
     frame = 0;
     video.pause();
-    audio.pause();
+    fadeSound();
     showWords(els, Infinity);
     header?.classList.add('is-in');
     setState('ended');
@@ -224,7 +246,7 @@ export function runReel(): void {
     storeSoundPref(soundOn);
     showSound();
     if (soundOn) primeSound();
-    else audio.pause();
+    else fadeSound();
   });
 
   control.addEventListener('click', () => {

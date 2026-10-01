@@ -1,10 +1,73 @@
 ---
-import Base from '../layouts/Base.astro';
-import Hero from '../components/Hero.astro';
-import poster from '../assets/hero/first.jpg';
+// Holding page for https://aaastrategy.eu while the site is finished on dev.
+// To go live, revert this commit on prod and merge dev into it.
+import '../styles/global.css';
+import jost from '../assets/fonts/jost.woff2?url';
+import logo from '../assets/logo/AAA_logo.svg?url';
+
+const description = 'Ad Astra Acriter — advisory for a changing world.';
 ---
 
-<Base intro>
-  <link slot="head" rel="preload" href={poster.src} as="image" />
-  <Hero />
-</Base>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ad Astra Acriter</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#F7F7F5" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="icon" href={`${import.meta.env.BASE_URL}favicon.svg`} type="image/svg+xml" />
+    <link rel="preload" href={jost} as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <main class="soon">
+      <h1><img src={logo} width="1191" height="442" alt="Ad Astra Acriter" /></h1>
+      <p><span class="dot" aria-hidden="true"></span>Preparing the future</p>
+    </main>
+  </body>
+</html>
+
+<style>
+  body { grid-template-rows: 1fr; }
+
+  .soon {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: clamp(32px, 5vw, 56px);
+    padding: var(--gutter);
+    animation: rise 1.6s var(--ease-soft) both;
+  }
+
+  h1 { margin: 0; }
+
+  h1 img {
+    display: block;
+    width: clamp(140px, 18vw, 220px);
+    height: auto;
+  }
+
+  p {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 -.3em 0 0; /* balance the trailing letter-spacing */
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 450;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+  }
+</style>

@@ -24,7 +24,7 @@ const SOURCES: ReelSources = {
     <img class="reel-still" src={last.src} width={last.width} height={last.height} alt="" decoding="async" />
     <video class="reel-video" muted playsinline preload="none" poster={first.src} data-sources={JSON.stringify(SOURCES)}></video>
     <div class="reel-veil"></div>
-    <audio class="reel-sound" preload="auto" src={sound}></audio>
+    <audio class="reel-sound" preload="none" src={sound}></audio>
   </div>
 
   <div class="stage">
@@ -184,6 +184,10 @@ const SOURCES: ReelSources = {
   }
 
   .reel-controls[hidden] { display: none; }
+
+  /* No skip for now: the button (still wired up in reel.ts) only shows once
+     the reel has ended, as Replay / Play intro. Drop this rule to bring Skip back. */
+  .hero:not([data-state="ended"]) .reel-control { display: none; }
 
   .reel-control,
   .reel-mute {

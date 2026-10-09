@@ -1,5 +1,5 @@
 """
-Builds the hero reel from videos/1.mp4 ... 8.mp4.
+Builds the hero reel from the clips in videos/ (see SEGMENTS).
 
 Steps:
   1. paint out the signature watermark on the clips that carry one (see
@@ -42,8 +42,6 @@ SEGMENTS = [
     (1, 0.80),  # opening hold
     (2, 0.70),  # "In a changing world"
     (3, 0.90),
-    (4, 0.90),
-    (5, 0.90),
     (6, 0.60),  # "We must rethink"
     (7, 0.50),  # Ad Astra Acriter -> ΛΛΛ, which then holds
     (8, 0.80),  # runs out to the closing still

@@ -36,7 +36,8 @@ const CUES = (() => {
 // Sound is on unless the visitor turned it off before. Browsers may still
 // refuse to start it without a click, in which case the toggle shows it off.
 const SOUND_KEY = 'aaa:sound';
-const SOUND_DRIFT = 0.3; // s the soundtrack may wander from the picture
+const SOUND_DRIFT = 0.5; // s the soundtrack may wander from the picture
+const SOUND_SETTLE = 2000; // ms to leave the soundtrack alone after re-aligning it
 const SOUND_RELEASE = 600; // ms the soundtrack takes to die away when cut short
 
 function readSoundPref(): boolean {
@@ -162,7 +163,15 @@ export function runReel(): void {
     release = requestAnimationFrame(step);
   };
 
-  // Play, pause or re-align the soundtrack to match the picture.
+  // Play, pause or re-align the soundtrack to match the picture. Only
+  // re-align once the audio is really running, and not again straight away:
+  // its clock lags while it buffers or seeks (and Safari reports it late
+  // anyway), so checking every frame seeks over and over and chops it up.
+  let aligned = 0;
+  const align = () => {
+    audio.currentTime = video.currentTime;
+    aligned = performance.now();
+  };
   const syncSound = () => {
     const want = soundOn && hero.dataset.state !== 'ended' && !video.paused && !stalled;
     if (!want) {
@@ -170,8 +179,14 @@ export function runReel(): void {
       return;
     }
     if (release) unrelease();
-    if (Math.abs(audio.currentTime - video.currentTime) > SOUND_DRIFT) audio.currentTime = video.currentTime;
-    if (audio.paused) audio.play().catch(refused);
+    if (audio.paused) {
+      if (Math.abs(audio.currentTime - video.currentTime) > SOUND_DRIFT) align();
+      audio.play().catch(refused);
+      return;
+    }
+    const settled = !audio.seeking && audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+      && performance.now() - aligned > SOUND_SETTLE;
+    if (settled && Math.abs(audio.currentTime - video.currentTime) > SOUND_DRIFT) align();
   };
 
   // Start the soundtrack from a click (or try to, on load): browsers only
@@ -180,7 +195,7 @@ export function runReel(): void {
   const primeSound = () => {
     if (!soundOn) return;
     unrelease();
-    audio.currentTime = video.currentTime;
+    align();
     audio.play().then(syncSound, refused);
   };
 
